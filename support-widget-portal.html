@@ -15,25 +15,42 @@
   <div class="wrap">
     <div class="card">
       <h1>Message Support</h1>
-      <p class="muted">This page will load our messaging widget. If you see nothing, try refreshing.</p>
+      <p class="muted">Send us a note and we’ll reply by email. Typical response: under one business day.</p>
 
-      <!-- STEP 5 will go here:
-           We’ll paste the HubSpot chatflow script + small identification snippet. -->
-      <div id="widget-anchor"></div>
+      <!-- 👇 The chat will render INSIDE this box -->
+      <div id="hs-inline-widget" aria-label="Support chat"></div>
     </div>
   </div>
-  <!-- HubSpot chatflow goes right below this line when you have access -->
-<!-- <script>PASTE_HUBSPOT_SNIPPET_HERE</script> -->
 
+  <style>
+    /* polish the page */
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #f8faf8; }
+    .wrap { display: grid; place-items: center; min-height: 100%; padding: 32px; }
+    .card { width: 100%; max-width: 880px; background: #fff; border: 1px solid #eaeaea; border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+    .card h1 { margin: 0 0 8px; font-size: 28px; }
+    .muted { color: #616161; margin: 0 0 16px; }
+
+    /* size the inline chat iframe */
+    #hs-inline-widget { height: 560px; }
+    /* optional extra polish on the iframe container HubSpot injects */
+    #hubspot-conversations-inline-iframe { width: 100%; height: 100%; border: 0; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+  </style>
+
+  <!-- Tell HubSpot to embed the widget inline and load it -->
   <script>
-    // optional: read email from querystring so we can identify the visitor later
-    // Example Assembly app URL you set: https://yourdomain.com/support-widget.html?email={{client.email}}
-    const params = new URLSearchParams(window.location.search);
-    window.__portalEmail = params.get("email") || "";
-    // We’ll use __portalEmail during Step 5 when we add the HubSpot script.
+    // 1) Put the widget inside #hs-inline-widget
+    window.hsConversationsSettings = {
+      inlineEmbedSelector: '#hs-inline-widget'
+    };
+    // 2) When the SDK is ready, load the widget (and it will render inline)
+    window.hsConversationsOnReady = [
+      function () {
+        window.HubSpotConversations.widget.load(); // loads inline since we set inlineEmbedSelector
+      }
+    ];
   </script>
-  <!-- Start of HubSpot Embed Code -->
-<script type="text/javascript" id="hs-script-loader" async defer src="//js.hs-scripts.com/45880416.js"></script>
-<!-- End of HubSpot Embed Code -->
+
+  <!-- Your HubSpot embed (keep your portal ID) -->
+  <script id="hs-script-loader" async defer src="https://js.hs-scripts.com/45880416.js"></script>
 </body>
 </html>
