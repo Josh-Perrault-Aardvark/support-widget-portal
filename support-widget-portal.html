@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Message Support</title>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { display: grid; place-items: center; height: 100%; padding: 24px; }
+    .card { max-width: 640px; width: 100%; border: 1px solid #eee; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+    .muted { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Message Support</h1>
+      <p class="muted">This page will load our messaging widget. If you see nothing, try refreshing.</p>
+
+      <!-- STEP 5 will go here:
+           We’ll paste the HubSpot chatflow script + small identification snippet. -->
+      <div id="widget-anchor"></div>
+    </div>
+  </div>
+
+  <script>
+    // optional: read email from querystring so we can identify the visitor later
+    // Example Assembly app URL you set: https://yourdomain.com/support-widget.html?email={{client.email}}
+    const params = new URLSearchParams(window.location.search);
+    window.__portalEmail = params.get("email") || "";
+    // We’ll use __portalEmail during Step 5 when we add the HubSpot script.
+  </script>
+</body>
+</html>
