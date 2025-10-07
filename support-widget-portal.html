@@ -15,6 +15,8 @@
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
     #form-anchor { min-height: 640px; }
+
+    /* Hide the Email field row once HubSpot renders it */
     .hs_email { display: none !important; }
   </style>
 </head>
@@ -27,10 +29,10 @@
     </div>
   </div>
 
-  <!-- HubSpot Forms v2 embed -->
+  <!-- HubSpot Forms v2 embed (required to prefill/hide fields) -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
-    // Read ?email= from the URL and prefill the Email field, then hide it.
+    // Read ?email= from the URL (Assembly will pass this)
     const params = new URLSearchParams(location.search);
     const portalEmail = (params.get('email') || '').trim();
 
@@ -40,14 +42,14 @@
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
       onFormReady: function ($form) {
-        if (portalEmail) {
-          const $email = $form.find('input[name="email"]');
-          if ($email.length) {
-            $email.val(portalEmail).trigger('input').trigger('change');
-            const $row = $form.find('.hs_email');
-            if ($row.length) $row.hide();
-          }
+        // Prefill Email and hide the field row
+        const $email = $form.find('input[name="email"]');
+        if (portalEmail && $email.length) {
+          $email.val(portalEmail).trigger('input').trigger('change');
         }
+        // Ensure the Email row is hidden even if not prefilled yet
+        const $row = $form.find('.hs_email');
+        if ($row.length) $row.hide();
       }
     });
   </script>
