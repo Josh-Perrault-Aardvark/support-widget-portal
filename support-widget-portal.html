@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Contact Us</title>
+
   <style>
     :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; }
     * { box-sizing: border-box; }
@@ -29,7 +30,7 @@
   <!-- HubSpot Forms v2 embed -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
-    // Read ?email= from the URL (Assembly will pass this)
+    // Read ?email= from the URL (Assembly should pass this)
     const params = new URLSearchParams(location.search);
     const portalEmail = (params.get('email') || '').trim();
 
@@ -39,16 +40,32 @@
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
       onFormReady: function ($form) {
-        // Fill Email if provided
+        // 1) Locate the Email input inside the rendered HubSpot form
         const $email = $form.find('input[name="email"]');
+
+        // 2) Prefill from URL if present
         if (portalEmail && $email.length) {
           $email.val(portalEmail).trigger('input').trigger('change');
         }
-        // Hide the entire Email field row inside the form (reliable selector)
-        const $emailRow = $email.closest('.hs-form-field');
-        if ($emailRow.length) { $emailRow.hide(); }
+
+        // 3) Hide the email field aggressively so it never shows to clients
+        if ($email.length) {
+          // Hide the input itself
+          $email.attr('type', 'hidden').hide();
+
+          // Hide common wrappers and labels HubSpot uses
+          $email.parent().hide();                          // input container
+          $email.closest('.hs-form-field').hide();         // standard HS wrapper
+          $email.closest('fieldset').hide();               // some themes wrap in fieldset
+          $form.find('.hs_email').hide();                  // legacy class if present
+
+          // Hide any label linked to the input
+          const id = $email.attr('id');
+          if (id) { $form.find('label[for="'+id+'"]').hide(); }
+        }
       }
     });
   </script>
+  <!-- v108 -->
 </body>
 </html>
