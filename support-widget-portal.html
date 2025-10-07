@@ -1,53 +1,40 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Contact Us</title>
-  <style>
-    :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { min-height: 100vh; display: grid; place-items: center; padding: 32px; }
-    .card { width: 100%; max-width: 960px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
-    .card h1 { margin: 0 0 8px; font-size: 28px; }
-    .muted { color: var(--muted); margin: 0 0 16px; }
-    #form-anchor { min-height: 640px; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Contact Us</h1>
-      <p class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
-      <div id="form-anchor"></div>
-    </div>
-  </div>
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Contact Us</title>
+<style>
+  :root{--bg:#f8faf8;--card:#fff;--border:#eaeaea;--text:#111;--muted:#616161}
+  *{box-sizing:border-box} html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{min-height:100vh;display:grid;place-items:center;padding:32px}
+  .card{width:100%;max-width:960px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+  .card h1{margin:0 0 8px;font-size:28px}.muted{color:var(--muted);margin:0 0 16px}
+  #form-anchor{min-height:640px}
+</style>
+</head><body>
+<div class="wrap"><div class="card">
+  <h1>Contact Us</h1>
+  <p class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
+  <div id="form-anchor"></div>
+</div></div>
 
-  <!-- HubSpot Forms v2 embed -->
-  <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
-  <script>
-    const params = new URLSearchParams(location.search);
-    const portalEmail = (params.get('email') || '').trim();
+<script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const portalEmail = (params.get('email') || '').trim();
 
-    hbspt.forms.create({
-      region: "na1",
-      portalId: "45880416",
-      formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
-      target: "#form-anchor",
-      onFormReady: function ($form) {
-        if (portalEmail) {
-          const $email = $form.find('input[name="email"]');
-          if ($email.length) {
-            $email.val(portalEmail).trigger('input').trigger('change');
-            const $row = $form.find('.hs_email');
-            if ($row.length) $row.hide();
-          }
+  hbspt.forms.create({
+    region: "na1",
+    portalId: "45880416",
+    formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
+    target: "#form-anchor",
+    onFormReady: function ($form) {
+      if (portalEmail) {
+        const $email = $form.find('input[name="email"]');
+        if ($email.length) {
+          $email.val(portalEmail).trigger('input').trigger('change');
+          const $row = $form.find('.hs_email'); if ($row.length) $row.hide();
         }
       }
-    });
-  </script>
-</body>
-</html>
+    }
+  });
+</script>
+</body></html>
