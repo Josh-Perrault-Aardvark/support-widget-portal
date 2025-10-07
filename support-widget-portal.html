@@ -30,9 +30,17 @@
   <!-- HubSpot Forms v2 embed -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
-    // Read ?email= from the URL (Assembly should pass this)
-    const params = new URLSearchParams(location.search);
-    const portalEmail = (params.get('email') || '').trim();
+    // Read email from either the query string (?email=) or the hash (#email=)
+    function getEmailFromUrl() {
+      const search = new URLSearchParams(window.location.search);
+      if (search.get('email')) return (search.get('email') || '').trim();
+
+      // hash may look like "#email=user@example.com" or "#email=user@example.com&..."
+      const hash = window.location.hash || '';
+      const m = hash.match(/[#&]email=([^&]+)/i);
+      return m ? decodeURIComponent(m[1]).trim() : '';
+    }
+    const portalEmail = getEmailFromUrl();
 
     hbspt.forms.create({
       region: "na1",
@@ -40,32 +48,23 @@
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
       onFormReady: function ($form) {
-        // 1) Locate the Email input inside the rendered HubSpot form
+        // Prefill and hide the Email field inside the rendered form
         const $email = $form.find('input[name="email"]');
-
-        // 2) Prefill from URL if present
         if (portalEmail && $email.length) {
           $email.val(portalEmail).trigger('input').trigger('change');
         }
-
-        // 3) Hide the email field aggressively so it never shows to clients
         if ($email.length) {
-          // Hide the input itself
           $email.attr('type', 'hidden').hide();
-
-          // Hide common wrappers and labels HubSpot uses
-          $email.parent().hide();                          // input container
-          $email.closest('.hs-form-field').hide();         // standard HS wrapper
-          $email.closest('fieldset').hide();               // some themes wrap in fieldset
-          $form.find('.hs_email').hide();                  // legacy class if present
-
-          // Hide any label linked to the input
+          $email.parent().hide();
+          $email.closest('.hs-form-field').hide();
+          $email.closest('fieldset').hide();
+          $form.find('.hs_email').hide();
           const id = $email.attr('id');
-          if (id) { $form.find('label[for="'+id+'"]').hide(); }
+          if (id) $form.find('label[for="'+id+'"]').hide();
         }
       }
     });
   </script>
-  <!-- v108 -->
+  <!-- v110 -->
 </body>
 </html>
