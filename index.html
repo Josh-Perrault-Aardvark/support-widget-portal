@@ -1,3 +1,18 @@
 <!doctype html>
-<meta http-equiv="refresh" content="0; url=./support-widget-portal.html">
-<title>Redirecting…</title>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <script>
+    // Preserve ?token=… and #email=… when redirecting
+    window.location.replace(
+      './support-widget-portal.html' + window.location.search + window.location.hash
+    );
+  </script>
+  <noscript>
+    <!-- Fallback (won’t preserve query/hash if JS is disabled) -->
+    <meta http-equiv="refresh" content="0; url=./support-widget-portal.html">
+  </noscript>
+</head>
+<body>Redirecting…</body>
+</html>
