@@ -7,18 +7,15 @@
   <style>
     :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; }
     * { box-sizing: border-box; }
-    html, body {
-      height: 100%; margin: 0; background: var(--bg); color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     .wrap { min-height: 100vh; display: grid; place-items: center; padding: 32px; }
-    .card {
-      width: 100%; max-width: 960px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06);
-    }
+    .card { width: 100%; max-width: 960px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
-    #form-anchor { min-height: 640px; }
+    /* Reserve some height so layout doesn't jump while HubSpot loads */
+    #form-anchor { min-height: 520px; }
   </style>
 </head>
 <body>
@@ -32,61 +29,150 @@
 
   <!-- HubSpot Forms v2 embed -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
-  <script>
-    // pull email from ?email=... or #email=...
-    function getEmail() {
-      const qs = new URLSearchParams(location.search);
-      const hash = location.hash.startsWith('#') ? new URLSearchParams(location.hash.slice(1)) : null;
-      return (qs.get('email') || (hash && hash.get('email')) || '').trim();
-    }
 
+  <script>
+    /* -----------------------------------------------------------
+       Helper: Resolve the portal user's email from URL or token
+       ----------------------------------------------------------- */
+    function getEmailFromHash() {
+      const m = (window.location.hash || "").match(/[#&]email=([^&]+)/i);
+      return m ? decodeURIComponent(m[1]).trim() : "";
+    }
+    function getEmailFromQuery() {
+      const qs = new URLSearchParams(window.location.search);
+      return (qs.get("email") || "").trim();
+    }
+    function base64urlToJson(b64u) {
+      try {
+        const pad = "=".repeat((4 - (b64u.length % 4)) % 4);
+        const b64 = (b64u + pad).replace(/-/g, "+").replace(/_/g, "/");
+        const txt = atob(b64);
+        return JSON.parse(decodeURIComponent(escape(txt)));
+      } catch (_) { return null; }
+    }
+    function deepFindEmail(obj) {
+      if (!obj || typeof obj !== "object") return "";
+      const direct = [
+        "email","user_email","userEmail","contact_email","contactEmail",
+        "primaryEmail","user.email","contact.email","claims.email","data.email"
+      ];
+      for (const k of direct) {
+        const v = k.includes(".") ? k.split(".").reduce((o, key)=> (o||{})[key], obj) : obj[k];
+        if (typeof v === "string" && v.includes("@")) return v;
+      }
+      for (const v of Object.values(obj)) {
+        if (typeof v === "string" && v.includes("@")) return v;
+        if (v && typeof v === "object") {
+          const nested = deepFindEmail(v);
+          if (nested) return nested;
+        }
+      }
+      return "";
+    }
+    function getEmailFromToken() {
+      const qs = new URLSearchParams(window.location.search);
+      const token = (qs.get("token") || "").trim();
+      if (!token || !token.includes(".")) return "";
+      const parts = token.split(".");
+      if (parts.length < 2) return "";
+      const payload = base64urlToJson(parts[1]);
+      return payload ? deepFindEmail(payload) : "";
+    }
+    function resolvePortalEmail() {
+      return getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
+    }
+    const portalEmail = resolvePortalEmail();
+
+    /* -----------------------------------------------------------
+       Render HubSpot form: prefill + hide Email
+       ----------------------------------------------------------- */
     hbspt.forms.create({
       region: "na1",
       portalId: "45880416",
-      formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
+      formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",  // Wix Contact Form
       target: "#form-anchor",
 
       onFormReady: function ($form) {
-        // Prefill + hide Email
-        const email = getEmail();
+        // Prefill + hide Email field
         const $email = $form.find('input[name="email"]');
         if ($email.length) {
-          if (email) $email.val(email).trigger('input').trigger('change');
+          if (portalEmail) {
+            $email.val(portalEmail).trigger('input').trigger('change');
+          }
+          // Hide email in the UI (keeps value for submission)
           $email.attr('type','hidden').hide();
-          $email.closest('.hs-form-field, fieldset, .hs_email').hide();
-          const id = $email.attr('id'); if (id) $form.find('label[for="'+id+'"]').hide();
+          $email.parent().hide();
+          $email.closest('.hs-form-field').hide();
+          $email.closest('fieldset').hide();
+          $form.find('.hs_email').hide();
+          const id = $email.attr('id');
+          if (id) $form.find('label[for="'+id+'"]').hide();
         }
 
-        // ---- FORCE THE TEXTAREA HEIGHT (works regardless of HubSpot theme) ----
-        function forceTextarea() {
-          // Grab the first visible textarea in the form (your “Message” field)
-          var ta = $form.find('textarea:visible')[0];
-          if (!ta) return;
+        /* -------------------------------------------------------
+           OVERRIDE HubSpot's textarea autosizer so height sticks
+           ------------------------------------------------------- */
+        function lockTextareaHeight(pixels = 240) {
+          const $ta = $form.find('textarea.hsfc-TextareaInput');
+          if (!$ta.length) return;
 
-          // Rows hint (helps in some themes)
-          ta.setAttribute('rows','12');
+          const ta = $ta[0];
+          const doc = ta.ownerDocument;
 
-          // Hard-force size with !important so HubSpot cannot override later
-          ta.style.setProperty('min-height','360px','important');
-          ta.style.setProperty('height','360px','important');
-          ta.style.setProperty('overflow','auto','important');
-          ta.style.setProperty('resize','vertical','important');
-          ta.style.setProperty('line-height','1.4','important');
-          ta.style.setProperty('padding','12px','important');
+          // 1) Add CSS inside the iframe with !important (beats inline heights)
+          const style = doc.createElement('style');
+          style.textContent = `
+            textarea.hsfc-TextareaInput {
+              height:${pixels}px !important;
+              min-height:${pixels}px !important;
+              max-height:${pixels}px !important;
+              line-height:1.4;
+            }
+            /* Allow user drag-resize if you want: set to 'none' to forbid */
+            textarea.hsfc-TextareaInput { resize: vertical; }
+          `;
+          doc.head.appendChild(style);
+
+          // 2) Force current inline height with !important
+          ta.style.setProperty('height', pixels + 'px', 'important');
+          ta.style.setProperty('minHeight', pixels + 'px', 'important');
+          ta.style.setProperty('maxHeight', pixels + 'px', 'important');
+
+          // 3) **This line disables HubSpot's autosizer:**
+          // Replace the node with a clone to drop any attached autosize listeners.
+          const clone = ta.cloneNode(true);         // keep attributes
+          clone.value = ta.value;                   // keep current text
+          ta.replaceWith(clone);                    // <-- disabling line
+
+          // 4) Guard rail: stop bubbling to any capturing handlers HubSpot may add later
+          const stop = e => e.stopImmediatePropagation && e.stopImmediatePropagation();
+          ['input','change','keyup','keydown','cut','paste'].forEach(evt =>
+            clone.addEventListener(evt, stop, true)
+          );
+
+          // 5) Final guard: if any script tweaks inline style, snap it back immediately
+          const mo = new MutationObserver(muts => {
+            for (const m of muts) {
+              if (m.type === 'attributes' && m.attributeName === 'style') {
+                clone.style.setProperty('height', pixels + 'px', 'important');
+                clone.style.setProperty('minHeight', pixels + 'px', 'important');
+                clone.style.setProperty('maxHeight', pixels + 'px', 'important');
+              }
+            }
+          });
+          mo.observe(clone, { attributes: true, attributeFilter: ['style'] });
+
+          // Let things settle after initial load; autosizer rarely re-fires after a few seconds
+          setTimeout(() => mo.disconnect(), 6000);
         }
 
-        // Apply now and keep applying for a short period to beat any late inline styles
-        forceTextarea();
-        let count = 0;
-        const iv = setInterval(() => {
-          forceTextarea();
-          if (++count >= 20) clearInterval(iv);   // ~5 seconds total (20 * 250ms)
-        }, 250);
-
-        // Also re-apply if user types and HS auto-resizes
-        $form.on('input', 'textarea', forceTextarea);
+        // Run once after HubSpot finishes its own first pass of sizing.
+        // A short delay ensures we beat any late inline height writes.
+        setTimeout(() => lockTextareaHeight(260), 150);
       }
     });
   </script>
+
+  <!-- vBaseline+AutosizerOverride -->
 </body>
 </html>
