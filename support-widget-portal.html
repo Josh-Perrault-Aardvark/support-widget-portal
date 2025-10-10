@@ -14,7 +14,19 @@
       border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
+
+    /* Keep room for a larger textarea */
     #form-anchor { min-height: 640px; }
+
+    /* --- STRONG textarea sizing override (CSS path is very specific) --- */
+    #form-anchor .hs-form textarea,
+    #form-anchor .hs-form .hs-input[type="textarea"],
+    #form-anchor .hs-form .hs-fieldtype-textarea textarea,
+    #form-anchor textarea.hs-input {
+      min-height: 260px !important; /* adjust to taste (200-400px) */
+      height: 260px !important;     /* set explicit height as well */
+      resize: vertical;              /* allow user to resize if they want */
+    }
   </style>
 </head>
 <body>
@@ -48,7 +60,6 @@
     }
     function deepFindEmail(obj) {
       if (!obj || typeof obj !== "object") return "";
-      // direct keys we commonly see
       const direct = [
         "email","user_email","userEmail","contact_email","contactEmail",
         "primaryEmail","user.email","contact.email","claims.email","data.email"
@@ -57,7 +68,6 @@
         const v = k.includes(".") ? k.split(".").reduce((o, key)=> (o||{})[key], obj) : obj[k];
         if (typeof v === "string" && v.includes("@")) return v;
       }
-      // fallback: scan all string values for an @
       for (const v of Object.values(obj)) {
         if (typeof v === "string" && v.includes("@")) return v;
         if (v && typeof v === "object") {
@@ -77,7 +87,6 @@
       return payload ? deepFindEmail(payload) : "";
     }
     function resolvePortalEmail() {
-      // priority: hash (#email=...), then query (?email=...), then token payload (?token=...)
       return getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
     }
     const portalEmail = resolvePortalEmail();
@@ -89,12 +98,12 @@
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
       onFormReady: function ($form) {
+        // 1) Prefill + hide email
         const $email = $form.find('input[name="email"]');
         if ($email.length) {
           if (portalEmail) {
             $email.val(portalEmail).trigger('input').trigger('change');
           }
-          // aggressively hide the email field
           $email.attr('type','hidden').hide();
           $email.parent().hide();
           $email.closest('.hs-form-field').hide();
@@ -103,14 +112,19 @@
           const id = $email.attr('id');
           if (id) $form.find('label[for="'+id+'"]').hide();
         }
+
+        // 2) FORCE the textarea to be larger (JS fallback in case CSS gets overridden)
+        //    Adjust selectors to your internal field name if needed.
+        //    This covers any textarea on the form, plus a direct name match for “message”.
+        var $textareas = $form.find('textarea, textarea[name="message"]');
+        $textareas.each(function(){
+          this.style.minHeight = '260px';
+          this.style.height = '260px';
+          this.setAttribute('rows','10');
+        });
       }
     });
   </script>
-  <style>
-  textarea.hs-input {
-    min-height: 200px !important;
-  }
-</style>
-  <!-- v111 -->
+  <!-- v112 -->
 </body>
 </html>
