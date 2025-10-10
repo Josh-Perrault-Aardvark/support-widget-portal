@@ -19,15 +19,6 @@
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
     #form-anchor { min-height: 640px; }
-
-    /* Extra-strong styling to ensure the textarea is tall */
-    #form-anchor .hs-form textarea.hs-input {
-      min-height: 300px !important;
-      height: 300px !important;
-      resize: vertical !important;
-      line-height: 1.4;
-      padding: 12px;
-    }
   </style>
 </head>
 <body>
@@ -43,7 +34,7 @@
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
     /* -------------------------------
-       Helpers to resolve the portal email
+       Resolve portal email from URL
        ------------------------------- */
     function getEmailFromHash() {
       const m = (window.location.hash || "").match(/[#&]email=([^&]+)/i);
@@ -63,11 +54,8 @@
     }
     function deepFindEmail(obj) {
       if (!obj || typeof obj !== "object") return "";
-      const direct = [
-        "email","user_email","userEmail","contact_email","contactEmail",
-        "primaryEmail","user.email","contact.email","claims.email","data.email"
-      ];
-      for (const k of direct) {
+      const keys = ["email","user_email","userEmail","contact_email","contactEmail","primaryEmail","user.email","contact.email","claims.email","data.email"];
+      for (const k of keys) {
         const v = k.includes(".") ? k.split(".").reduce((o, key)=> (o||{})[key], obj) : obj[k];
         if (typeof v === "string" && v.includes("@")) return v;
       }
@@ -89,11 +77,7 @@
       const payload = base64urlToJson(parts[1]);
       return payload ? deepFindEmail(payload) : "";
     }
-    function resolvePortalEmail() {
-      // priority: #email=... > ?email=... > ?token=...
-      return getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
-    }
-    const portalEmail = resolvePortalEmail();
+    const portalEmail = getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
 
     /* -------------------------------
        Render HubSpot form
@@ -103,33 +87,40 @@
       portalId: "45880416",
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
+      cssRequired: "https://cdn2.hubspot.net/hub/hs/forms/static-embed/v2.css",
+      cssClass: "custom-contact-form",
       onFormReady: function ($form) {
-        // Prefill + hide the Email field
+        // Hide + prefill Email
         const $email = $form.find('input[name="email"]');
         if ($email.length) {
-          if (portalEmail) {
-            $email.val(portalEmail).trigger('input').trigger('change');
-          }
-          // Hide thoroughly
+          if (portalEmail) $email.val(portalEmail).trigger('input').trigger('change');
           $email.attr('type','hidden').hide();
-          $email.parent().hide();
-          $email.closest('.hs-form-field').hide();
-          $email.closest('fieldset').hide();
-          $form.find('.hs_email').hide();
-          const id = $email.attr('id');
-          if (id) $form.find('label[for="'+id+'"]').hide();
+          $email.closest('.hs-form-field, fieldset, .hs_email').hide();
+          const id = $email.attr('id'); if (id) $form.find('label[for="'+id+'"]').hide();
         }
 
-        // Force the message textarea to be tall
-        // If you know the internal name (e.g. 'message'), use textarea[name="message"]
-        const $message = $form.find('textarea.hs-input:visible').first();
-        if ($message.length) {
-          $message.attr('rows', 12);
-          $message.css({ minHeight: '300px', height: '300px', resize: 'vertical' });
-        }
+        // Inject CSS INSIDE the HubSpot iframe to force a tall textarea
+        const iframeDoc = $form.closest('html')[0].ownerDocument;
+        const style = iframeDoc.createElement('style');
+        style.innerHTML = `
+          textarea.hs-input {
+            min-height: 300px !important;
+            height: 300px !important;
+            overflow: hidden !important; /* needed for auto-grow */
+            line-height: 1.4;
+            padding: 12px;
+            resize: vertical;
+          }
+        `;
+        iframeDoc.head.appendChild(style);
+
+        // Auto-grow textarea as user types
+        const $tas = $form.find('textarea.hs-input');
+        function autoGrow(el){ el.style.height='auto'; el.style.height=(el.scrollHeight)+'px'; }
+        $tas.each((_, el) => { autoGrow(el); el.addEventListener('input', () => autoGrow(el)); });
       }
     });
   </script>
-  <!-- v112 -->
+  <!-- v113 -->
 </body>
 </html>
