@@ -17,6 +17,9 @@
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
+
+    /* HARD HIDE any email inputs/labels that might be injected */
+    #email, [name="email"], label[for="email"] { display:none !important; visibility:hidden !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
   </style>
 </head>
 <body>
@@ -26,7 +29,7 @@
       <p class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
 
       <form id="cform" novalidate>
-        <!-- Email is truly hidden; we fill it from URL/hash/token -->
+        <!-- Truly hidden email (no label, no wrapper) -->
         <input id="email" name="email" type="hidden" />
 
         <label for="message">Your message</label>
@@ -38,7 +41,7 @@
     </div>
   </div>
 
-  <!-- Kill switch: removes any HubSpot embed injected by GTM/CMS -->
+  <!-- Kill switch: removes any HubSpot embed injected by CMS/GTM -->
   <script>
     (function killHubSpotEmbeds(){
       const nuke = () => {
@@ -53,7 +56,20 @@
   </script>
 
   <script>
-    // --- Helpers: resolve email & basic validation ---
+    // Extra safety: if the builder injected an email field anyway, remove it.
+    (function stripVisibleEmailFields(){
+      const removeIfEmail = el => {
+        if (!el) return;
+        if (el.tagName === 'LABEL' && el.getAttribute('for') === 'email') el.remove();
+        if (el.tagName === 'INPUT' && el.name === 'email') el.remove();
+        // remove any parent wrappers that now only contain whitespace
+        const p = el.parentElement;
+        if (p && p.textContent.trim() === '') p.remove();
+      };
+      document.querySelectorAll('label[for="email"], input[name="email"]').forEach(removeIfEmail);
+    })();
+
+    // --- Helpers: resolve email & validation ---
     function getEmailFromHash(){ const m=(location.hash||"").match(/[#&]email=([^&]+)/i); return m?decodeURIComponent(m[1]).trim():""; }
     function getEmailFromQuery(){ const qs=new URLSearchParams(location.search); return (qs.get("email")||"").trim(); }
     function base64urlToJson(b64u){ try{ const pad="=".repeat((4-(b64u.length%4))%4); const b64=(b64u+pad).replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(b64)))); }catch(_){ return null; } }
@@ -72,13 +88,13 @@
       emailInput.value = resolvedEmail;
     }
 
-    // Require message content before enabling submit
+    // Require non-whitespace message before enabling submit
     function toggleButton() {
       const hasMsg = messageEl.value.trim().length > 0;
       submitBtn.disabled = !hasMsg;
     }
     messageEl.addEventListener('input', toggleButton);
-    toggleButton(); // initialize
+    toggleButton();
 
     function setStatus(msg, ok){ statusEl.textContent = msg; statusEl.className = "note " + (ok ? "ok" : "err"); }
 
@@ -93,13 +109,10 @@
       const email   = emailInput.value.trim();
       const message = messageEl.value.trim();
 
-      // Guard: email must exist & be valid (we never show a field)
       if (!isValidEmail(email)) {
         return setStatus("We couldn't detect your email. Please open this page from your portal link that includes your email.", false);
       }
-      if (!message) { // extra safety; button should already be disabled
-        return setStatus("Please enter a message.", false);
-      }
+      if (!message) { return setStatus("Please enter a message.", false); }
 
       setStatus("Sending…", true);
 
@@ -107,7 +120,7 @@
       const payload = {
         fields: [
           { name: "email", value: email },
-          { name: "message", value: message }  // change "message" if your HubSpot internal name differs
+          { name: "message", value: message } // change if your HubSpot internal name differs
         ],
         context: { hutk, pageUri: location.href, pageName: document.title }
       };
