@@ -7,11 +7,15 @@
   <style>
     :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; }
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    html, body {
+      height: 100%; margin: 0; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
     .wrap { min-height: 100vh; display: grid; place-items: center; padding: 32px; }
-    .card { width: 100%; max-width: 960px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+    .card {
+      width: 100%; max-width: 960px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06);
+    }
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
     #form-anchor { min-height: 640px; }
@@ -26,35 +30,14 @@
     </div>
   </div>
 
+  <!-- HubSpot Forms v2 embed -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
-    // pull email from URL if present
+    // read email from URL (?email=... or #email=...)
     function getEmail() {
       const qs = new URLSearchParams(location.search);
       const h = location.hash.startsWith('#') ? new URLSearchParams(location.hash.slice(1)) : null;
       return (qs.get('email') || (h && h.get('email')) || '').trim();
-    }
-
-    // resize helper runs inside HubSpot's DOM via the jQuery object they pass
-    function forceResize($form) {
-      const HEIGHT = 420; // change if you want taller/shorter
-      const apply = () => {
-        const $tas = $form.find('textarea');
-        $tas.each((_, el) => {
-          el.style.minHeight = HEIGHT + 'px';
-          el.style.height = HEIGHT + 'px';
-          el.style.overflow = 'hidden';
-          el.style.resize = 'vertical';
-          el.setAttribute('rows', '12');
-        });
-      };
-      // apply immediately and for a few seconds to defeat late styling
-      apply();
-      let tries = 0;
-      const iv = setInterval(() => {
-        apply();
-        if (++tries >= 20) clearInterval(iv); // ~6 seconds
-      }, 300);
     }
 
     hbspt.forms.create({
@@ -63,7 +46,7 @@
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
       onFormReady: function ($form) {
-        // hide + prefill email if present
+        // 1) Prefill + hide Email
         const email = getEmail();
         const $email = $form.find('input[name="email"]');
         if ($email.length) {
@@ -73,8 +56,50 @@
           const id = $email.attr('id'); if (id) $form.find('label[for="'+id+'"]').hide();
         }
 
-        // force the multiline message box bigger (any textarea on the form)
-        forceResize($form);
+        // 2) Inject CSS *inside the iframe* using the $form context
+        //    This guarantees the styles apply to the form HubSpot renders.
+        const $html = $form.closest('html');     // <html> inside the iframe
+        const $head = $html.find('head');        // <head> inside the iframe
+        const css = `
+          textarea.hs-input {
+            min-height: 360px !important;
+            height: 360px !important;
+            overflow: hidden !important;
+            line-height: 1.4;
+            padding: 12px;
+            resize: vertical;
+          }
+        `;
+        const styleTag = $html[0].ownerDocument.createElement('style');
+        styleTag.type = 'text/css';
+        styleTag.appendChild($html[0].ownerDocument.createTextNode(css));
+        $head.append(styleTag);
+
+        // 3) As a backstop, directly set size on any textarea inside the form
+        function sizeTextareas() {
+          const $tas = $form.find('textarea');
+          $tas.each((_, el) => {
+            el.style.minHeight = '360px';
+            el.style.height    = '360px';
+            el.style.overflow  = 'hidden';
+            el.style.resize    = 'vertical';
+            el.setAttribute('rows','12');
+          });
+        }
+        sizeTextareas();
+
+        // 4) Re-apply a few times in case HubSpot late-styles the field
+        let tries = 0;
+        const iv = setInterval(() => {
+          sizeTextareas();
+          if (++tries >= 10) clearInterval(iv);
+        }, 300);
+
+        // 5) Optional: auto-grow while typing
+        $form.find('textarea').on('input', function(){
+          this.style.height = 'auto';
+          this.style.height = this.scrollHeight + 'px';
+        });
       }
     });
   </script>
