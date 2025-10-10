@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Contact Us</title>
   <style>
-    :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; }
+    :root { --bg:#f8faf8; --card:#fff; --border:#eaeaea; --text:#111; --muted:#616161; --brand:#155b3d; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
@@ -14,15 +14,14 @@
       border-radius: 16px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
     .card h1 { margin: 0 0 8px; font-size: 28px; }
     .muted { color: var(--muted); margin: 0 0 16px; }
-    #form-anchor { min-height: 520px; }
-
-    /* Big, comfortable editor (the only one users see) */
-    .ext-field { margin: 0 0 16px; }
-    .ext-field label { display: block; font-weight: 600; margin: 0 0 8px; }
-    .ext-field textarea {
-      width: 100%; min-height: 260px; padding: 12px; font-size: 16px; line-height: 1.5;
-      border: 1px solid var(--border); border-radius: 10px;
-    }
+    label { display:block; font-weight:600; margin: 14px 0 8px; }
+    input, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; }
+    textarea { min-height: 280px; line-height: 1.5; } /* <- adjust height here */
+    button { margin-top: 16px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--brand);
+      background: var(--brand); color: #fff; font-weight: 600; cursor: pointer; }
+    .note { margin-top: 10px; font-size: 14px; color: var(--muted); }
+    .ok { color:#0a6b3e; }
+    .err { color:#b42318; }
   </style>
 </head>
 <body>
@@ -31,55 +30,47 @@
       <h1>Contact Us</h1>
       <p class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
 
-      <!-- The ONLY message box users interact with -->
-      <div class="ext-field">
-        <label for="external-message">Your message</label>
-        <textarea id="external-message" placeholder="Type your message here…"></textarea>
-      </div>
+      <form id="cform" novalidate>
+        <!-- Email can be hidden if you always pass it in; keeping visible helps users correct typos -->
+        <label for="email">Your email</label>
+        <input id="email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
 
-      <!-- HubSpot form mount -->
-      <div id="form-anchor"></div>
+        <label for="message">Message</label>
+        <textarea id="message" name="message" placeholder="Type your message here…"></textarea>
+
+        <button type="submit">Submit</button>
+        <div id="status" class="note"></div>
+      </form>
     </div>
   </div>
 
-  <!-- HubSpot Forms v2 embed -->
-  <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
-
   <script>
-    /* -----------------------------------------------------------
-       Resolve user email (from hash, query, or token) and hide it
-       ----------------------------------------------------------- */
+    // ---------- Reuse your email resolver ----------
     function getEmailFromHash() {
-      const m = (window.location.hash || "").match(/[#&]email=([^&]+)/i);
+      const m = (location.hash || "").match(/[#&]email=([^&]+)/i);
       return m ? decodeURIComponent(m[1]).trim() : "";
     }
     function getEmailFromQuery() {
-      const qs = new URLSearchParams(window.location.search);
+      const qs = new URLSearchParams(location.search);
       return (qs.get("email") || "").trim();
     }
     function base64urlToJson(b64u) {
       try {
         const pad = "=".repeat((4 - (b64u.length % 4)) % 4);
         const b64 = (b64u + pad).replace(/-/g, "+").replace(/_/g, "/");
-        const txt = atob(b64);
-        return JSON.parse(decodeURIComponent(escape(txt)));
-      } catch(_) { return null; }
+        return JSON.parse(decodeURIComponent(escape(atob(b64))));
+      } catch (_) { return null; }
     }
     function deepFindEmail(obj) {
       if (!obj || typeof obj !== "object") return "";
-      const direct = ["email","user_email","userEmail","contact_email","contactEmail","primaryEmail","user.email","contact.email","claims.email","data.email"];
-      for (const k of direct) {
-        const v = k.includes(".") ? k.split(".").reduce((o, key)=> (o||{})[key], obj) : obj[k];
-        if (typeof v === "string" && v.includes("@")) return v;
-      }
-      for (const v of Object.values(obj)) {
+      for (const [k,v] of Object.entries(obj)) {
         if (typeof v === "string" && v.includes("@")) return v;
         if (v && typeof v === "object") { const nested = deepFindEmail(v); if (nested) return nested; }
       }
       return "";
     }
     function getEmailFromToken() {
-      const qs = new URLSearchParams(window.location.search);
+      const qs = new URLSearchParams(location.search);
       const token = (qs.get("token") || "").trim();
       if (!token || !token.includes(".")) return "";
       const parts = token.split(".");
@@ -87,50 +78,69 @@
       const payload = base64urlToJson(parts[1]);
       return payload ? deepFindEmail(payload) : "";
     }
-    function resolvePortalEmail() {
-      return getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
+    const resolvedEmail = getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
+    if (resolvedEmail) document.getElementById('email').value = resolvedEmail;
+
+    // ---------- HubSpot Submission API ----------
+    const portalId = "45880416";
+    const formGuid  = "e6aec654-2411-411d-9124-4dc25a5ab8d6"; // same HubSpot form
+
+    // If you hit CORS issues, change this to your proxy endpoint (see snippet below)
+    const SUBMIT_URL = `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`;
+
+    const statusEl = document.getElementById('status');
+    function setStatus(msg, ok) {
+      statusEl.textContent = msg;
+      statusEl.className = "note " + (ok ? "ok" : "err");
     }
-    const portalEmail = resolvePortalEmail();
 
-    /* -----------------------------------------------------------
-       Render HubSpot form, hide email, and sync message
-       ----------------------------------------------------------- */
-    const externalTA = document.getElementById('external-message');
+    document.getElementById('cform').addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    hbspt.forms.create({
-      region: "na1",
-      portalId: "45880416",
-      formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
-      target: "#form-anchor",
+      const email = document.getElementById('email').value.trim();
+      const message = document.getElementById('message').value.trim();
 
-      onFormReady: function ($form) {
-        // Prefill + hide Email field
-        const $email = $form.find('input[name="email"]');
-        if ($email.length) {
-          if (portalEmail) $email.val(portalEmail).trigger('input').trigger('change');
-          $email.attr('type','hidden').hide()
-                .parent().hide()
-                .closest('.hs-form-field').hide();
-          $form.find('.hs_email').hide();
-          const id = $email.attr('id');
-          if (id) $form.find('label[for="'+id+'"]').hide();
+      if (!email) { setStatus("Please enter your email.", false); return; }
+      // Basic email sanity check
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setStatus("Please enter a valid email.", false); return; }
+      if (!message) { setStatus("Please enter a message.", false); return; }
+
+      setStatus("Sending…", true);
+
+      // HubSpot attribution cookie (optional but nice to include)
+      const hutk = document.cookie.split('; ').find(c => c.startsWith('hubspotutk='))?.split('=')[1] || undefined;
+
+      // Build the payload for HubSpot
+      const payload = {
+        fields: [
+          { name: "email", value: email },
+          { name: "message", value: message } // <-- if your field has a different internal name, swap it here
+        ],
+        context: {
+          hutk,
+          pageUri: location.href,
+          pageName: document.title
         }
+      };
 
-        // Find HubSpot's message field inside the iframe
-        const $hsMsg = $form.find('textarea[name="message"], textarea.hsfc-TextareaInput').first();
-        if ($hsMsg.length) {
-          // Hide the HubSpot field entirely so users only see the big one above
-          $hsMsg.closest('.hs-form-field').hide();
-          // Keep values synchronized from our big textarea to HubSpot’s hidden field
-          const sync = () => { $hsMsg.val(externalTA.value).trigger('input').trigger('change'); };
-          externalTA.addEventListener('input', sync);
-          // Initial sync in case user types before HS finishes sizing
-          sync();
-          // Safety net: in case HS scripts touch the value later
-          const iv = setInterval(sync, 500);
-          // Ensure last sync on submit, then stop the interval
-          $form.on('submit', function(){ sync(); clearInterval(iv); });
+      try {
+        const res = await fetch(SUBMIT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          setStatus("Thanks! Your message has been sent.", true);
+          e.target.reset();
+          // if you want: redirect or show a nicer “thank you”
+        } else {
+          const txt = await res.text();
+          setStatus("Submission failed (" + res.status + "). " + txt, false);
         }
+      } catch (err) {
+        // Most common issue is CORS blocked by your host setup.
+        setStatus("Network error. If this persists, we’ll switch to a tiny proxy (see snippet). " + (err?.message || ""), false);
       }
     });
   </script>
