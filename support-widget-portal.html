@@ -12,12 +12,18 @@
     .muted { color:#616161; margin:0 0 16px; }
     label { display:block; font-weight:600; margin:14px 0 8px; }
     textarea { width:100%; min-height:280px; line-height:1.5; padding:12px; border:1px solid #e0e0e0; border-radius:10px; font-size:16px; }
-    button { margin-top:16px; padding:10px 16px; border-radius:10px; border:1px solid #155b3d; background:#155b3d; color:#fff; font-weight:600; cursor:pointer; }
+
+    /* Primary button */
+    #submitBtn { margin-top:16px; padding:10px 16px; border-radius:10px; border:1px solid #155b3d; background:#155b3d; color:#fff; font-weight:600; cursor:pointer; }
+
+    /* Neutralize any external disabled styling */
+    #submitBtn[disabled] { opacity:1 !important; filter:none !important; pointer-events:auto !important; cursor:pointer !important; }
+
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
 
-    /* Belt & suspenders: hard-hide any stray email controls */
+    /* Hard-hide any stray email controls that might be injected */
     #email, [name="email"], label[for="email"] { display:none !important; visibility:hidden !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
   </style>
 </head>
@@ -28,7 +34,7 @@
       <p class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
 
       <form id="cform" novalidate>
-        <!-- Hidden email: filled from URL/hash/token -->
+        <!-- Hidden email (filled from URL/hash/token) -->
         <input id="email" name="email" type="hidden" />
 
         <label for="message">Your message</label>
@@ -40,7 +46,7 @@
     </div>
   </div>
 
-  <!-- Kill switch: remove any HubSpot embed injected by CMS/GTM -->
+  <!-- Kill-switch: remove any HubSpot form embeds injected by CMS/GTM -->
   <script>
     (function killHubSpotEmbeds(){
       const nuke = () => {
@@ -55,7 +61,7 @@
   </script>
 
   <script>
-    // --- Email resolver (hidden field; never shown) ---
+    // ---------- Email resolver (hidden field; never shown) ----------
     function getEmailFromHash(){ const m=(location.hash||"").match(/[#&]email=([^&]+)/i); return m?decodeURIComponent(m[1]).trim():""; }
     function getEmailFromQuery(){ const qs=new URLSearchParams(location.search); return (qs.get("email")||"").trim(); }
     function base64urlToJson(b64u){ try{ const pad="=".repeat((4-(b64u.length%4))%4); const b64=(b64u+pad).replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(b64)))); }catch(_){ return null; } }
@@ -65,6 +71,7 @@
 
     const emailInput = document.getElementById('email');
     const messageEl  = document.getElementById('message');
+    const submitBtn  = document.getElementById('submitBtn');
     const statusEl   = document.getElementById('status');
 
     const resolvedEmail = (getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "").trim();
@@ -72,7 +79,18 @@
 
     function setStatus(msg, ok){ statusEl.textContent = msg; statusEl.className = "note " + (ok ? "ok" : "err"); }
 
-    // --- HubSpot Submission API ---
+    // ---------- Force-enable the button (handles caches/GTM re-disabling) ----------
+    function forceEnableBtn(){
+      submitBtn.disabled = false;
+      submitBtn.removeAttribute('disabled');
+      submitBtn.style.opacity = '';
+      submitBtn.style.pointerEvents = '';
+    }
+    forceEnableBtn();
+    // Watchdog in case something re-adds "disabled" later
+    setInterval(forceEnableBtn, 500);
+
+    // ---------- HubSpot Submission API ----------
     const portalId = "45880416";
     const formGuid = "e6aec654-2411-411d-9124-4dc25a5ab8d6";
     const SUBMIT_URL = `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`;
@@ -83,13 +101,10 @@
       const email   = emailInput.value.trim();
       const message = messageEl.value.trim();
 
-      // Require a non-empty message (HTML `required` helps, but we enforce too)
-      if (!message) {
-        messageEl.focus();
-        return setStatus("Please enter a message.", false);
-      }
+      // Validate message (must have non-whitespace)
+      if (!message) { messageEl.focus(); return setStatus("Please enter a message.", false); }
 
-      // Require a valid email (we never show a field; must come from URL/hash/token)
+      // Validate email (comes from URL/hash/token)
       if (!isValidEmail(email)) {
         return setStatus("We couldn't detect your email. Please open this page from your portal link that includes your email.", false);
       }
