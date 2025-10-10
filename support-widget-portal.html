@@ -62,19 +62,16 @@
         Have a question? Please submit your message below and we will respond to you via email as soon as we can!
       </p>
 
-      <form id="cform" novalidate>
-        <!-- Email group is hidden by default; JS will reveal it if needed -->
-        <div id="email-group" class="hidden">
-          <label for="email">Your email</label>
-          <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" />
-        </div>
+<form id="cform" novalidate>
+  <input id="email" name="email" type="hidden" />
 
-        <label for="message">Your message</label>
-        <textarea id="message" name="message" placeholder="Type your message here…"></textarea>
+  <label for="message">Your message</label>
+  <textarea id="message" name="message" placeholder="Type your message here…"></textarea>
 
-        <button type="submit">Submit</button>
-        <div id="status" class="note"></div>
-      </form>
+  <button type="submit">Submit</button>
+  <div id="status" class="note"></div>
+</form>
+
     </div>
   </div>
 
