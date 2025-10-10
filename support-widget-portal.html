@@ -57,53 +57,34 @@
           const id = $email.attr('id'); if (id) $form.find('label[for="'+id+'"]').hide();
         }
 
-        // --- Make the textarea taller (works for both classic & new HubSpot markup) ---
-        // Selectors we’ll force-height:
-        const TA_SELECTORS = [
-          'textarea.hsfc-TextareaInput',      // new (what you have)
-          'textarea.hs-input',                // classic
-          'textarea[name$="/message"]',       // safety: name like 0-1/message
-          'textarea[name="message"]'
-        ].join(',');
+        // ---- FORCE THE TEXTAREA HEIGHT (works regardless of HubSpot theme) ----
+        function forceTextarea() {
+          // Grab the first visible textarea in the form (your “Message” field)
+          var ta = $form.find('textarea:visible')[0];
+          if (!ta) return;
 
-        // Inject CSS *inside the iframe* so it always wins
-        const doc = $form.closest('html')[0].ownerDocument;
-        const styleTag = doc.createElement('style');
-        styleTag.type = 'text/css';
-        styleTag.appendChild(doc.createTextNode(`
-          ${TA_SELECTORS} {
-            min-height: 360px !important;
-            height: 360px !important;
-            overflow: auto !important;
-            line-height: 1.4;
-            padding: 12px;
-            resize: vertical;
-          }
-        `));
-        doc.head.appendChild(styleTag);
+          // Rows hint (helps in some themes)
+          ta.setAttribute('rows','12');
 
-        // Backstop: directly set inline styles on any matching textarea
-        function forceSize() {
-          $form.find(TA_SELECTORS).each(function(){
-            this.style.minHeight = '360px';
-            this.style.height    = '360px';
-            this.style.overflow  = 'auto';
-            this.style.resize    = 'vertical';
-            // rows helps some themes
-            this.setAttribute('rows','12');
-          });
+          // Hard-force size with !important so HubSpot cannot override later
+          ta.style.setProperty('min-height','360px','important');
+          ta.style.setProperty('height','360px','important');
+          ta.style.setProperty('overflow','auto','important');
+          ta.style.setProperty('resize','vertical','important');
+          ta.style.setProperty('line-height','1.4','important');
+          ta.style.setProperty('padding','12px','important');
         }
-        forceSize();
 
-        // Re-apply a few times in case HubSpot late-styles fields
-        let n = 0;
-        const iv = setInterval(() => { forceSize(); if (++n >= 10) clearInterval(iv); }, 250);
+        // Apply now and keep applying for a short period to beat any late inline styles
+        forceTextarea();
+        let count = 0;
+        const iv = setInterval(() => {
+          forceTextarea();
+          if (++count >= 20) clearInterval(iv);   // ~5 seconds total (20 * 250ms)
+        }, 250);
 
-        // Optional: auto-grow while typing (feels nice)
-        $form.on('input', TA_SELECTORS, function(){
-          this.style.height = 'auto';
-          this.style.height = Math.max(this.scrollHeight, 360) + 'px';
-        });
+        // Also re-apply if user types and HS auto-resizes
+        $form.on('input', 'textarea', forceTextarea);
       }
     });
   </script>
