@@ -50,6 +50,8 @@
     .note { margin-top: 10px; font-size: 14px; color: #616161; }
     .ok { color: #0a6b3e; }
     .err { color: #b42318; }
+    /* Hide utility */
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -61,8 +63,11 @@
       </p>
 
       <form id="cform" novalidate>
-        <label for="email">Your email</label>
-        <input id="email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
+        <!-- Email group is hidden by default; JS will reveal it if needed -->
+        <div id="email-group" class="hidden">
+          <label for="email">Your email</label>
+          <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" />
+        </div>
 
         <label for="message">Your message</label>
         <textarea id="message" name="message" placeholder="Type your message here…"></textarea>
@@ -88,14 +93,27 @@
   </script>
 
   <script>
-    // --- Autofill email from URL/hash/token ---
+    // --- Email resolver (URL hash, query, or JWT-like token) ---
     function getEmailFromHash(){ const m=(location.hash||"").match(/[#&]email=([^&]+)/i); return m?decodeURIComponent(m[1]).trim():""; }
     function getEmailFromQuery(){ const qs=new URLSearchParams(location.search); return (qs.get("email")||"").trim(); }
     function base64urlToJson(b64u){ try{ const pad="=".repeat((4-(b64u.length%4))%4); const b64=(b64u+pad).replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(b64)))); }catch(_){ return null; } }
     function deepFindEmail(obj){ if(!obj||typeof obj!=="object") return ""; for(const [k,v] of Object.entries(obj)){ if(typeof v==="string" && v.includes("@")) return v; if(v&&typeof v==="object"){ const n=deepFindEmail(v); if(n) return n; } } return ""; }
     function getEmailFromToken(){ const qs=new URLSearchParams(location.search); const t=(qs.get("token")||"").trim(); if(!t||!t.includes(".")) return ""; const p=t.split("."); if(p.length<2) return ""; const payload=base64urlToJson(p[1]); return payload?deepFindEmail(payload):""; }
-    const resolvedEmail = getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "";
-    if (resolvedEmail) document.getElementById('email').value = resolvedEmail;
+    function isValidEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
+
+    const emailInput = document.getElementById('email');
+    const emailGroup = document.getElementById('email-group');
+
+    // Try to prefill
+    const resolvedEmail = (getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "").trim();
+    if (resolvedEmail && isValidEmail(resolvedEmail)) {
+      emailInput.value = resolvedEmail;
+      // keep hidden
+    } else {
+      // couldn't resolve – show the field so user can fill it
+      emailGroup.classList.remove('hidden');
+      emailInput.setAttribute('required', 'required');
+    }
 
     // --- HubSpot Submission API ---
     const portalId = "45880416";
@@ -107,11 +125,15 @@
 
     document.getElementById('cform').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('email').value.trim();
+      const email = emailInput.value.trim();
       const message = document.getElementById('message').value.trim();
 
-      if (!email) return setStatus("Please enter your email.", false);
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setStatus("Please enter a valid email.", false);
+      if (!isValidEmail(email)) {
+        // If it was hidden but invalid/missing somehow, reveal it for correction
+        emailGroup.classList.remove('hidden');
+        emailInput.setAttribute('required', 'required');
+        return setStatus("Please enter a valid email.", false);
+      }
       if (!message) return setStatus("Please enter a message.", false);
 
       setStatus("Sending…", true);
@@ -120,7 +142,7 @@
       const payload = {
         fields: [
           { name: "email", value: email },
-          { name: "message", value: message }  // Change "message" if your internal field name differs
+          { name: "message", value: message }  // change if your field's internal name differs
         ],
         context: { hutk, pageUri: location.href, pageName: document.title }
       };
@@ -135,6 +157,7 @@
         if (res.ok) {
           setStatus("Thanks! Your message has been sent.", true);
           e.target.reset();
+          // keep it hidden after success
         } else {
           setStatus("Submission failed (" + res.status + "). " + text, false);
         }
