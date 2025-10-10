@@ -33,11 +33,11 @@
   <!-- HubSpot Forms v2 embed -->
   <script src="https://js.hsforms.net/forms/embed/v2.js" charset="utf-8"></script>
   <script>
-    // read email from URL (?email=... or #email=...)
+    // pull email from ?email=... or #email=...
     function getEmail() {
       const qs = new URLSearchParams(location.search);
-      const h = location.hash.startsWith('#') ? new URLSearchParams(location.hash.slice(1)) : null;
-      return (qs.get('email') || (h && h.get('email')) || '').trim();
+      const hash = location.hash.startsWith('#') ? new URLSearchParams(location.hash.slice(1)) : null;
+      return (qs.get('email') || (hash && hash.get('email')) || '').trim();
     }
 
     hbspt.forms.create({
@@ -45,8 +45,9 @@
       portalId: "45880416",
       formId: "e6aec654-2411-411d-9124-4dc25a5ab8d6",
       target: "#form-anchor",
+
       onFormReady: function ($form) {
-        // 1) Prefill + hide Email
+        // Prefill + hide Email
         const email = getEmail();
         const $email = $form.find('input[name="email"]');
         if ($email.length) {
@@ -56,49 +57,52 @@
           const id = $email.attr('id'); if (id) $form.find('label[for="'+id+'"]').hide();
         }
 
-        // 2) Inject CSS *inside the iframe* using the $form context
-        //    This guarantees the styles apply to the form HubSpot renders.
-        const $html = $form.closest('html');     // <html> inside the iframe
-        const $head = $html.find('head');        // <head> inside the iframe
-        const css = `
-          textarea.hs-input {
+        // --- Make the textarea taller (works for both classic & new HubSpot markup) ---
+        // Selectors we’ll force-height:
+        const TA_SELECTORS = [
+          'textarea.hsfc-TextareaInput',      // new (what you have)
+          'textarea.hs-input',                // classic
+          'textarea[name$="/message"]',       // safety: name like 0-1/message
+          'textarea[name="message"]'
+        ].join(',');
+
+        // Inject CSS *inside the iframe* so it always wins
+        const doc = $form.closest('html')[0].ownerDocument;
+        const styleTag = doc.createElement('style');
+        styleTag.type = 'text/css';
+        styleTag.appendChild(doc.createTextNode(`
+          ${TA_SELECTORS} {
             min-height: 360px !important;
             height: 360px !important;
-            overflow: hidden !important;
+            overflow: auto !important;
             line-height: 1.4;
             padding: 12px;
             resize: vertical;
           }
-        `;
-        const styleTag = $html[0].ownerDocument.createElement('style');
-        styleTag.type = 'text/css';
-        styleTag.appendChild($html[0].ownerDocument.createTextNode(css));
-        $head.append(styleTag);
+        `));
+        doc.head.appendChild(styleTag);
 
-        // 3) As a backstop, directly set size on any textarea inside the form
-        function sizeTextareas() {
-          const $tas = $form.find('textarea');
-          $tas.each((_, el) => {
-            el.style.minHeight = '360px';
-            el.style.height    = '360px';
-            el.style.overflow  = 'hidden';
-            el.style.resize    = 'vertical';
-            el.setAttribute('rows','12');
+        // Backstop: directly set inline styles on any matching textarea
+        function forceSize() {
+          $form.find(TA_SELECTORS).each(function(){
+            this.style.minHeight = '360px';
+            this.style.height    = '360px';
+            this.style.overflow  = 'auto';
+            this.style.resize    = 'vertical';
+            // rows helps some themes
+            this.setAttribute('rows','12');
           });
         }
-        sizeTextareas();
+        forceSize();
 
-        // 4) Re-apply a few times in case HubSpot late-styles the field
-        let tries = 0;
-        const iv = setInterval(() => {
-          sizeTextareas();
-          if (++tries >= 10) clearInterval(iv);
-        }, 300);
+        // Re-apply a few times in case HubSpot late-styles fields
+        let n = 0;
+        const iv = setInterval(() => { forceSize(); if (++n >= 10) clearInterval(iv); }, 250);
 
-        // 5) Optional: auto-grow while typing
-        $form.find('textarea').on('input', function(){
+        // Optional: auto-grow while typing (feels nice)
+        $form.on('input', TA_SELECTORS, function(){
           this.style.height = 'auto';
-          this.style.height = this.scrollHeight + 'px';
+          this.style.height = Math.max(this.scrollHeight, 360) + 'px';
         });
       }
     });
