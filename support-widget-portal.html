@@ -17,7 +17,9 @@
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
-    #email, [name="email"], label[for="email"] { display:none !important; visibility:hidden !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
+    /* Hard-hide hidden fields */
+    #email, #clientId, #clientName,
+    [name="email"], [name="assembly_client_id"], [name="assembly_client_name"] { display:none !important; }
     .thankyou { font-size:18px; line-height:1.5; color:#0a6b3e; margin:0; }
   </style>
 </head>
@@ -28,70 +30,79 @@
       <p id="intro" class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
 
       <form id="cform" novalidate>
+        <!-- Hidden fields -->
         <input id="email" name="email" type="hidden" />
         <input id="clientId" name="assembly_client_id" type="hidden" />
+        <input id="clientName" name="assembly_client_name" type="hidden" />
+
         <label for="message">Your message</label>
         <textarea id="message" name="message" placeholder="Type your message here…" required></textarea>
+
         <button id="submitBtn" type="submit">Submit</button>
         <div id="status" class="note" aria-live="polite"></div>
       </form>
     </div>
   </div>
+
   <script>
-    // Kill any stray HubSpot embeds
+    // Kill any stray HubSpot embeds (defensive)
     (function killHubSpotEmbeds(){
       const nuke = () => {
         document.querySelectorAll('iframe[src*="hsforms"],script[src*="hsforms"]').forEach(el => el.remove());
         document.querySelectorAll('.hs-form, [class*="hs_"], [id*="hs_"]').forEach(el => el.remove());
       };
-      nuke();
-      const mo = new MutationObserver(nuke);
-      mo.observe(document.documentElement, { childList: true, subtree: true });
+      nuke(); const mo = new MutationObserver(nuke);
+      mo.observe(document.documentElement, { childList:true, subtree:true });
       setTimeout(() => mo.disconnect(), 8000);
     })();
   </script>
-  <script>
-  // === Fill the hidden clientId field automatically ===
-  const qs = new URLSearchParams(location.search);
-  function getClientId() {
-    // works with ?client=123  OR  ?client_id=123  OR  #client=123
-    const q = qs.get('client') || qs.get('client_id') || qs.get('clientId');
-    if (q) return q.trim();
-    const m = (location.hash || '').match(/[#&](client|client_id|clientId)=([^&]+)/i);
-    return m ? decodeURIComponent(m[2]).trim() : '';
-  }
 
-  // write the value into the hidden input
-  const cid = getClientId();
-  const cidInput = document.getElementById('clientId');
-  if (cid && cidInput) cidInput.value = cid;
-  </script>
   <script>
-    // Email resolver (hidden)
-    function getEmailFromHash(){ const m=(location.hash||"").match(/[#&]email=([^&]+)/i); return m?decodeURIComponent(m[1]).trim():""; }
-    function getEmailFromQuery(){ const qs=new URLSearchParams(location.search); return (qs.get("email")||"").trim(); }
-    function base64urlToJson(b64u){ try{ const pad="=".repeat((4-(b64u.length%4))%4); const b64=(b64u+pad).replace(/-/g,"+").replace(/_/g,"/"); return JSON.parse(decodeURIComponent(escape(atob(b64)))); }catch(_){ return null; } }
-    function deepFindEmail(o){ if(!o||typeof o!=="object") return ""; for (const v of Object.values(o)) { if (typeof v==="string" && v.includes("@")) return v; if (v&&typeof v==="object"){ const n=deepFindEmail(v); if(n) return n; } } return ""; }
-    function getEmailFromToken(){ const qs=new URLSearchParams(location.search); const t=(qs.get("token")||"").trim(); if(!t||!t.includes(".")) return ""; const p=t.split("."); if(p.length<2) return ""; const payload=base64urlToJson(p[1]); return payload?deepFindEmail(payload):""; }
+    // ------------- helpers: get values from URL/hash/path -------------
+    const qs = new URLSearchParams(location.search);
+    function getParam(...names){
+      for (const n of names) {
+        const v = qs.get(n);
+        if (v) return v.trim();
+      }
+      const m = (location.hash||'').match(new RegExp('[#&](' + names.join('|') + ')=([^&]+)','i'));
+      return m ? decodeURIComponent(m[2]).trim() : '';
+    }
+    function getClientIdFromPath(){
+      // supports /clients/CLIENT_ID/... paths (change "clients" if your path differs)
+      const seg = location.pathname.split('/').filter(Boolean);
+      const i = seg.indexOf('clients');
+      return (i >= 0 && seg[i+1]) ? seg[i+1] : '';
+    }
     function isValidEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 
-    const emailInput = document.getElementById('email');
-    const messageEl  = document.getElementById('message');
-    const submitBtn  = document.getElementById('submitBtn');
-    const statusEl   = document.getElementById('status');
-    const formEl     = document.getElementById('cform');
-    const introEl    = document.getElementById('intro');
+    // ------------- populate hidden fields -------------
+    const emailEl  = document.getElementById('email');
+    const cidEl    = document.getElementById('clientId');
+    const cnameEl  = document.getElementById('clientName');
+    const msgEl    = document.getElementById('message');
+    const btnEl    = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('status');
+    const formEl   = document.getElementById('cform');
+    const introEl  = document.getElementById('intro');
 
-    const resolvedEmail = (getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "").trim();
-    if (resolvedEmail && isValidEmail(resolvedEmail)) emailInput.value = resolvedEmail;
+    // email: from hash/query/token if present (keeping simple: query/hash)
+    const resolvedEmail = getParam('email','user_email','contact_email');
+    if (resolvedEmail && isValidEmail(resolvedEmail)) emailEl.value = resolvedEmail;
 
-    function setStatus(msg, ok){ statusEl.textContent = msg; statusEl.className = "note " + (ok ? "ok" : "err"); }
+    // client id/name: from query/hash/path
+    const resolvedClientId   = getParam('client','client_id','clientId') || getClientIdFromPath();
+    const resolvedClientName = getParam('client_name','clientName','client_title');
+    if (resolvedClientId)   cidEl.value   = resolvedClientId;
+    if (resolvedClientName) cnameEl.value = resolvedClientName;
 
-    // Keep button enabled
-    function forceEnableBtn(){ submitBtn.disabled = false; submitBtn.removeAttribute('disabled'); submitBtn.style.opacity=''; submitBtn.style.pointerEvents=''; }
-    forceEnableBtn(); setInterval(forceEnableBtn, 500);
+    // keep button enabled (guard against external CSS/scripts)
+    function forceEnable(){ btnEl.disabled=false; btnEl.removeAttribute('disabled'); btnEl.style.opacity=''; btnEl.style.pointerEvents=''; }
+    forceEnable(); setInterval(forceEnable, 500);
 
-    // HubSpot Submission API
+    function setStatus(msg, ok){ statusEl.textContent = msg; statusEl.className = 'note ' + (ok ? 'ok' : 'err'); }
+
+    // ------------- HubSpot Forms API submit -------------
     const portalId = "45880416";
     const formGuid = "e6aec654-2411-411d-9124-4dc25a5ab8d6";
     const SUBMIT_URL = `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`;
@@ -99,46 +110,47 @@
     formEl.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const email   = emailInput.value.trim();
-      const message = messageEl.value.trim();
+      const email   = emailEl.value.trim();
+      const message = msgEl.value.trim();
+      const clientId = cidEl.value.trim();
+      const clientName = cnameEl.value.trim();
 
-      if (!message) { messageEl.focus(); return setStatus("Please enter a message.", false); }
-      if (!isValidEmail(email)) { return setStatus("We couldn't detect your email. Please open this page from your portal link that includes your email.", false); }
+      if (!message) { msgEl.focus(); return setStatus("Please enter a message.", false); }
+      if (!isValidEmail(email)) return setStatus("We couldn't detect your email. Open this page from your portal link that includes your email.", false);
 
       setStatus("Sending…", true);
 
       const hutk = document.cookie.split('; ').find(c => c.startsWith('hubspotutk='))?.split('=')[1];
-      const payload = {
-        fields: [
-          { name: "email", value: email },
-          { name: "message", value: message }
-        ],
-        context: { hutk, pageUri: location.href, pageName: document.title }
-      };
+
+      const fields = [
+        { name: "email", value: email },
+        { name: "message", value: message }
+      ];
+      if (clientId)   fields.push({ name: "assembly_client_id", value: clientId });
+      if (clientName) fields.push({ name: "assembly_client_name", value: clientName });
 
       try {
         const res = await fetch(SUBMIT_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            fields,
+            context: { hutk, pageUri: location.href, pageName: document.title }
+          })
         });
         const text = await res.text();
 
         if (res.ok) {
-          // Remove the intro line and the entire form; show thank-you
           if (introEl) introEl.remove();
-          const h1 = document.querySelector('.card h1');
-          if (h1) h1.remove();
           const thankYou = document.createElement('div');
           thankYou.className = 'thankyou';
           thankYou.innerHTML = `Thank you for your submission, we will be in touch soon.`;
           formEl.replaceWith(thankYou);
-          return;
         } else {
           setStatus("Submission failed (" + res.status + "). " + text, false);
         }
       } catch (err) {
-        setStatus("Network/CORS error. If this persists, we’ll switch to a tiny proxy.", false);
+        setStatus("Network/CORS error. If this persists, we can add a tiny proxy.", false);
       }
     });
   </script>
