@@ -13,13 +13,14 @@
     label { display:block; font-weight:600; margin:14px 0 8px; }
     textarea { width:100%; min-height:280px; line-height:1.5; padding:12px; border:1px solid #e0e0e0; border-radius:10px; font-size:16px; }
     #submitBtn { margin-top:16px; padding:10px 16px; border-radius:10px; border:1px solid #155b3d; background:#155b3d; color:#fff; font-weight:600; cursor:pointer; }
+    /* Neutralize any external disabled styling */
     #submitBtn[disabled] { opacity:1 !important; pointer-events:auto !important; cursor:pointer !important; }
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
-    .thankyou { font-size:18px; line-height:1.4; color:#0a6b3e; margin:12px 0 0; }
     /* Hard-hide any stray email controls that might be injected */
     #email, [name="email"], label[for="email"] { display:none !important; visibility:hidden !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
+    .thankyou { font-size:18px; line-height:1.5; color:#0a6b3e; margin:0; }
   </style>
 </head>
 <body>
@@ -107,7 +108,7 @@
       const payload = {
         fields: [
           { name: "email", value: email },
-          { name: "message", value: message }
+          { name: "message", value: message } // change if your HubSpot internal name differs
         ],
         context: { hutk, pageUri: location.href, pageName: document.title }
       };
@@ -122,11 +123,13 @@
 
         if (res.ok) {
           // Replace the entire form with a thank-you state
-          formEl.innerHTML = `
-            <p class="thankyou" role="status" aria-live="polite">
-              Thank you for your submission, we will be in touch soon.
-            </p>
+          const thankYou = document.createElement('div');
+          thankYou.className = 'thankyou';
+          thankYou.innerHTML = `
+            Thank you for your submission, we will be in touch soon.
           `;
+          formEl.replaceWith(thankYou);
+          return;
         } else {
           setStatus("Submission failed (" + res.status + "). " + text, false);
         }
