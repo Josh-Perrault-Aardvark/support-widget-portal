@@ -69,7 +69,6 @@
     const msgEl    = document.getElementById("message");
     const btnEl    = document.getElementById("submitBtn");
     const statusEl = document.getElementById("status");
-    const debugEl  = document.getElementById("debug");
     const formEl   = document.getElementById("cform");
     const headerEl = document.getElementById("headerBlock");
 
@@ -83,7 +82,6 @@
     if (resolvedClientId)   cidEl.value   = resolvedClientId;
     if (resolvedClientName) cnameEl.value = resolvedClientName;
 
-    debugEl.textContent = `Debug → clientId: ${cidEl.value || "(empty)"} | clientName: ${cnameEl.value || "(empty)"} | email: ${emailEl.value || "(empty)"}`;
 
     // keep button enabled (defensive)
     function forceEnable(){ btnEl.disabled=false; btnEl.removeAttribute("disabled"); btnEl.style.opacity=""; btnEl.style.pointerEvents=""; }
