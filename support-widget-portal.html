@@ -37,7 +37,6 @@
       </form>
     </div>
   </div>
-
   <script>
     // Kill any stray HubSpot embeds
     (function killHubSpotEmbeds(){
@@ -51,7 +50,22 @@
       setTimeout(() => mo.disconnect(), 8000);
     })();
   </script>
+  <script>
+  // === Fill the hidden clientId field automatically ===
+  const qs = new URLSearchParams(location.search);
+  function getClientId() {
+    // works with ?client=123  OR  ?client_id=123  OR  #client=123
+    const q = qs.get('client') || qs.get('client_id') || qs.get('clientId');
+    if (q) return q.trim();
+    const m = (location.hash || '').match(/[#&](client|client_id|clientId)=([^&]+)/i);
+    return m ? decodeURIComponent(m[2]).trim() : '';
+  }
 
+  // write the value into the hidden input
+  const cid = getClientId();
+  const cidInput = document.getElementById('clientId');
+  if (cid && cidInput) cidInput.value = cid;
+  </script>
   <script>
     // Email resolver (hidden)
     function getEmailFromHash(){ const m=(location.hash||"").match(/[#&]email=([^&]+)/i); return m?decodeURIComponent(m[1]).trim():""; }
