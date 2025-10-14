@@ -12,17 +12,12 @@
     .muted { color:#616161; margin:0 0 16px; }
     label { display:block; font-weight:600; margin:14px 0 8px; }
     textarea { width:100%; min-height:280px; line-height:1.5; padding:12px; border:1px solid #e0e0e0; border-radius:10px; font-size:16px; }
-
-    /* Primary button */
     #submitBtn { margin-top:16px; padding:10px 16px; border-radius:10px; border:1px solid #155b3d; background:#155b3d; color:#fff; font-weight:600; cursor:pointer; }
-
-    /* Neutralize any external disabled styling */
-    #submitBtn[disabled] { opacity:1 !important; filter:none !important; pointer-events:auto !important; cursor:pointer !important; }
-
+    #submitBtn[disabled] { opacity:1 !important; pointer-events:auto !important; cursor:pointer !important; }
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
-
+    .thankyou { font-size:18px; line-height:1.4; color:#0a6b3e; margin:12px 0 0; }
     /* Hard-hide any stray email controls that might be injected */
     #email, [name="email"], label[for="email"] { display:none !important; visibility:hidden !important; height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
   </style>
@@ -41,7 +36,7 @@
         <textarea id="message" name="message" placeholder="Type your message here…" required></textarea>
 
         <button id="submitBtn" type="submit">Submit</button>
-        <div id="status" class="note"></div>
+        <div id="status" class="note" aria-live="polite"></div>
       </form>
     </div>
   </div>
@@ -73,6 +68,7 @@
     const messageEl  = document.getElementById('message');
     const submitBtn  = document.getElementById('submitBtn');
     const statusEl   = document.getElementById('status');
+    const formEl     = document.getElementById('cform');
 
     const resolvedEmail = (getEmailFromHash() || getEmailFromQuery() || getEmailFromToken() || "").trim();
     if (resolvedEmail && isValidEmail(resolvedEmail)) emailInput.value = resolvedEmail;
@@ -87,7 +83,6 @@
       submitBtn.style.pointerEvents = '';
     }
     forceEnableBtn();
-    // Watchdog in case something re-adds "disabled" later
     setInterval(forceEnableBtn, 500);
 
     // ---------- HubSpot Submission API ----------
@@ -95,16 +90,13 @@
     const formGuid = "e6aec654-2411-411d-9124-4dc25a5ab8d6";
     const SUBMIT_URL = `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`;
 
-    document.getElementById('cform').addEventListener('submit', async (e) => {
+    formEl.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const email   = emailInput.value.trim();
       const message = messageEl.value.trim();
 
-      // Validate message (must have non-whitespace)
       if (!message) { messageEl.focus(); return setStatus("Please enter a message.", false); }
-
-      // Validate email (comes from URL/hash/token)
       if (!isValidEmail(email)) {
         return setStatus("We couldn't detect your email. Please open this page from your portal link that includes your email.", false);
       }
@@ -115,7 +107,7 @@
       const payload = {
         fields: [
           { name: "email", value: email },
-          { name: "message", value: message } // change if your HubSpot internal name differs
+          { name: "message", value: message }
         ],
         context: { hutk, pageUri: location.href, pageName: document.title }
       };
@@ -127,9 +119,14 @@
           body: JSON.stringify(payload)
         });
         const text = await res.text();
+
         if (res.ok) {
-          setStatus("Thanks! Your message has been sent.", true);
-          e.target.reset();
+          // Replace the entire form with a thank-you state
+          formEl.innerHTML = `
+            <p class="thankyou" role="status" aria-live="polite">
+              Thank you for your submission, we will be in touch soon.
+            </p>
+          `;
         } else {
           setStatus("Submission failed (" + res.status + "). " + text, false);
         }
