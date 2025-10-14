@@ -17,7 +17,6 @@
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
-    /* truly hide hidden fields */
     #email,#clientId,#clientName,[name="email"],[name="assembly_client_id"],[name="assembly_client_name"] { display:none !important; }
     .thankyou { font-size:18px; line-height:1.5; color:#0a6b3e; margin:0; }
   </style>
@@ -25,8 +24,11 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Contact Us</h1>
-      <p id="intro" class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
+      <!-- Wrap header + subtext so we can hide them together on success -->
+      <div id="headerBlock">
+        <h1>Contact Us</h1>
+        <p id="intro" class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
+      </div>
 
       <form id="cform" novalidate>
         <!-- Hidden fields sent to HubSpot -->
@@ -39,38 +41,29 @@
 
         <button id="submitBtn" type="submit">Submit</button>
         <div id="status" class="note" aria-live="polite"></div>
-        <!-- Tiny on-page debug so we can verify values -->
         <div id="debug" class="note"></div>
       </form>
     </div>
   </div>
 
   <script>
-    // --- helpers ---------------------------------------------------------
+    // ---------- helpers ----------
     const qs = new URLSearchParams(location.search);
     const hashStr = location.hash || "";
-
     function getParam(...names){
-      for (const n of names) {
-        const v = qs.get(n);
-        if (v) return v.trim();
-      }
-      // also allow in hash: #client=..., #client_name=...
+      for (const n of names) { const v = qs.get(n); if (v) return v.trim(); }
       const re = new RegExp("[#&](" + names.join("|") + ")=([^&]+)", "i");
       const m = hashStr.match(re);
       return m ? decodeURIComponent(m[2]).trim() : "";
     }
-
     function getClientIdFromPath(){
-      // supports /clients/CLIENT_ID/... (change 'clients' if your path differs)
       const seg = location.pathname.split("/").filter(Boolean);
       const i = seg.indexOf("clients");
       return (i >= 0 && seg[i+1]) ? seg[i+1] : "";
     }
-
     function isValidEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 
-    // --- elements --------------------------------------------------------
+    // ---------- elements ----------
     const emailEl  = document.getElementById("email");
     const cidEl    = document.getElementById("clientId");
     const cnameEl  = document.getElementById("clientName");
@@ -79,19 +72,18 @@
     const statusEl = document.getElementById("status");
     const debugEl  = document.getElementById("debug");
     const formEl   = document.getElementById("cform");
-    const introEl  = document.getElementById("intro");
+    const headerEl = document.getElementById("headerBlock");
 
-    // --- populate hidden fields -----------------------------------------
+    // ---------- populate hidden fields ----------
     const resolvedEmail = getParam("email","user_email","contact_email");
     if (resolvedEmail && isValidEmail(resolvedEmail)) emailEl.value = resolvedEmail;
 
-    const resolvedClientId   = getParam("client","client_id","clientId") || getClientIdFromPath();
-    const resolvedClientName = getParam("client_name","clientName","client_title");
-
+    // Prefer URL params (Assembly now passes them); fallbacks remain
+    const resolvedClientId   = (getParam("client_id","client","clientId") || getClientIdFromPath());
+    const resolvedClientName = (getParam("client_name","clientName","client_title"));
     if (resolvedClientId)   cidEl.value   = resolvedClientId;
     if (resolvedClientName) cnameEl.value = resolvedClientName;
 
-    // Show debug so we can see what's being captured
     debugEl.textContent = `Debug → clientId: ${cidEl.value || "(empty)"} | clientName: ${cnameEl.value || "(empty)"} | email: ${emailEl.value || "(empty)"}`;
 
     // keep button enabled (defensive)
@@ -100,8 +92,7 @@
 
     function setStatus(msg, ok){ statusEl.textContent = msg; statusEl.className = "note " + (ok ? "ok" : "err"); }
 
-    // --- HubSpot submission ---------------------------------------------
-    // Replace ONLY if your portalId/formId change.
+    // ---------- HubSpot submission ----------
     const portalId = "45880416";
     const formGuid = "e6aec654-2411-411d-9124-4dc25a5ab8d6";
     const SUBMIT_URL = `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formGuid}`;
@@ -141,7 +132,9 @@
         const text = await res.text();
 
         if (res.ok) {
-          if (introEl) introEl.remove();
+          // NEW: also hide the header block after successful submit
+          if (headerEl) headerEl.remove();
+
           const thanks = document.createElement("div");
           thanks.className = "thankyou";
           thanks.innerHTML = "Thank you for your submission, we will be in touch soon.";
