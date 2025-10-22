@@ -7,9 +7,8 @@
   <style>
     body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#f8faf8; color:#111; }
 
-    /* TOP-ALIGNED LAYOUT (changed) */
+    /* TOP-ALIGNED LAYOUT */
     .wrap {
-      /* remove centering */
       display:block;
       min-height:auto;
       padding:24px 32px 48px;
@@ -22,7 +21,7 @@
       border-radius:16px;
       padding:24px;
       box-shadow:0 6px 24px rgba(0,0,0,.06);
-      /* sit near the top, centered horizontally */
+      /* centered horizontally, near top vertically */
       margin:24px auto 48px;
     }
 
@@ -41,7 +40,6 @@
 
     .thankyou { font-size:18px; line-height:1.5; color:#0a6b3e; margin:0; }
 
-    /* Optional: slightly more top spacing on larger screens */
     @media (min-width: 1024px) {
       .wrap { padding-top:32px; }
       .card { margin-top:28px; }
@@ -51,7 +49,6 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <!-- Wrap header + subtext so we can hide them together on success -->
       <div id="headerBlock">
         <h1>Contact Us</h1>
         <p id="intro" class="muted">Have a question? Please submit your message below and we will respond to you via email as soon as we can!</p>
@@ -73,6 +70,34 @@
   </div>
 
   <script>
+    // ---------------- Anti-centering shim ----------------
+    // If any ancestor uses grid/flex with vertical centering, override to top.
+    (function uncenterAncestors(){
+      let el = document.querySelector('.wrap');
+      while (el && el !== document.documentElement) {
+        const p = el.parentElement;
+        if (!p) break;
+        const cs = getComputedStyle(p);
+        if (cs.display === 'grid') {
+          // If grid centering is detected, push to top
+          if (cs.placeItems.includes('center') || cs.alignItems === 'center') {
+            p.style.placeItems = 'start center';
+            p.style.alignItems = 'start';
+            p.style.alignContent = 'start';
+            p.style.justifyItems = p.style.justifyItems || 'center';
+          }
+        } else if (cs.display === 'flex') {
+          // Flex centering -> push to top
+          if (cs.alignItems === 'center') {
+            p.style.alignItems = 'flex-start';
+          }
+          // leave justify-content alone so it stays horizontally centered
+        }
+        el = p;
+      }
+    })();
+    // -----------------------------------------------------
+
     // ---------- helpers ----------
     const qs = new URLSearchParams(location.search);
     const hashStr = location.hash || "";
@@ -103,7 +128,6 @@
     const resolvedEmail = getParam("email","user_email","contact_email");
     if (resolvedEmail && isValidEmail(resolvedEmail)) emailEl.value = resolvedEmail;
 
-    // Prefer URL params (Assembly now passes them); fallbacks remain
     const resolvedClientId   = (getParam("client_id","client","clientId") || getClientIdFromPath());
     const resolvedClientName = (getParam("client_name","clientName","client_title"));
     if (resolvedClientId)   cidEl.value   = resolvedClientId;
@@ -155,9 +179,7 @@
         const text = await res.text();
 
         if (res.ok) {
-          // hide the header block after successful submit
           if (headerEl) headerEl.remove();
-
           const thanks = document.createElement("div");
           thanks.className = "thankyou";
           thanks.innerHTML = "Thank you for your submission, we will be in touch soon.";
