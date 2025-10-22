@@ -28,7 +28,23 @@
     h1 { margin:0 0 8px; font-size:28px; }
     .muted { color:#616161; margin:0 0 16px; }
     label { display:block; font-weight:600; margin:14px 0 8px; }
-    textarea { width:100%; min-height:280px; line-height:1.5; padding:12px; border:1px solid #e0e0e0; border-radius:10px; font-size:16px; }
+
+    /* NEW: make textarea align perfectly and remove resize handle */
+    .card, .card * { box-sizing: border-box; }
+    textarea {
+      width:100%;
+      min-height:280px;
+      line-height:1.5;
+      padding:12px;
+      border:1px solid #e0e0e0;
+      border-radius:10px;
+      font-size:16px;
+      display:block;
+      box-sizing:border-box;   /* stops right-edge overflow */
+      resize:none;             /* remove the little drag box; use 'vertical' if you want up/down only */
+      max-width:100%;
+    }
+
     #submitBtn { margin-top:16px; padding:10px 16px; border-radius:10px; border:1px solid #155b3d; background:#155b3d; color:#fff; font-weight:600; cursor:pointer; }
     #submitBtn[disabled] { opacity:1 !important; pointer-events:auto !important; cursor:pointer !important; }
     .note { margin-top:10px; font-size:14px; color:#616161; }
@@ -80,7 +96,7 @@
         const cs = getComputedStyle(p);
         if (cs.display === 'grid') {
           // If grid centering is detected, push to top
-          if (cs.placeItems.includes('center') || cs.alignItems === 'center') {
+          if ((cs.placeItems && cs.placeItems.includes('center')) || cs.alignItems === 'center') {
             p.style.placeItems = 'start center';
             p.style.alignItems = 'start';
             p.style.alignContent = 'start';
