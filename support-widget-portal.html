@@ -6,8 +6,26 @@
   <title>Contact Us</title>
   <style>
     body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#f8faf8; color:#111; }
-    .wrap { min-height:100vh; display:grid; place-items:center; padding:32px; }
-    .card { width:100%; max-width:960px; background:#fff; border:1px solid #eaeaea; border-radius:16px; padding:24px; box-shadow:0 6px 24px rgba(0,0,0,.06); }
+
+    /* TOP-ALIGNED LAYOUT (changed) */
+    .wrap {
+      /* remove centering */
+      display:block;
+      min-height:auto;
+      padding:24px 32px 48px;
+    }
+    .card {
+      width:100%;
+      max-width:960px;
+      background:#fff;
+      border:1px solid #eaeaea;
+      border-radius:16px;
+      padding:24px;
+      box-shadow:0 6px 24px rgba(0,0,0,.06);
+      /* sit near the top, centered horizontally */
+      margin:24px auto 48px;
+    }
+
     h1 { margin:0 0 8px; font-size:28px; }
     .muted { color:#616161; margin:0 0 16px; }
     label { display:block; font-weight:600; margin:14px 0 8px; }
@@ -17,8 +35,17 @@
     .note { margin-top:10px; font-size:14px; color:#616161; }
     .ok { color:#0a6b3e; }
     .err { color:#b42318; }
+
+    /* Hide hidden fields */
     #email,#clientId,#clientName,[name="email"],[name="assembly_client_id"],[name="assembly_client_name"] { display:none !important; }
+
     .thankyou { font-size:18px; line-height:1.5; color:#0a6b3e; margin:0; }
+
+    /* Optional: slightly more top spacing on larger screens */
+    @media (min-width: 1024px) {
+      .wrap { padding-top:32px; }
+      .card { margin-top:28px; }
+    }
   </style>
 </head>
 <body>
@@ -82,7 +109,6 @@
     if (resolvedClientId)   cidEl.value   = resolvedClientId;
     if (resolvedClientName) cnameEl.value = resolvedClientName;
 
-
     // keep button enabled (defensive)
     function forceEnable(){ btnEl.disabled=false; btnEl.removeAttribute("disabled"); btnEl.style.opacity=""; btnEl.style.pointerEvents=""; }
     forceEnable(); setInterval(forceEnable, 500);
@@ -129,7 +155,7 @@
         const text = await res.text();
 
         if (res.ok) {
-          // NEW: also hide the header block after successful submit
+          // hide the header block after successful submit
           if (headerEl) headerEl.remove();
 
           const thanks = document.createElement("div");
